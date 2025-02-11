@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tap-outbrain"
+version = "0.2.0"
+description = "Singer.io tap for extracting data from the Outbrain Amplify API"
+requires-python = ">=3.8"
+dependencies = [
+    "singer-python>=5.12.1",
+    "requests>=2.28.0",
+    "backoff>=2.1.2",
+    "python-dateutil>=2.8.2"
+]
+
+[project.scripts]
+tap-outbrain = "tap_outbrain:main"

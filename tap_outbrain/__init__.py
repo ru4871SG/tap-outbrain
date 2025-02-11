@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from decimal import Decimal
+from typing import Dict, List, Any, Optional
 
 import argparse
 import base64
@@ -51,8 +52,9 @@ def request(url, access_token, params={}):
             url,
             headers={'OB-TOKEN-V1': access_token},
             params=params)
-    except e:
+    except Exception as e:
         logger.exception(e)
+        raise
 
     logger.info("Got response code: {}".format(response.status_code))
 
@@ -63,9 +65,8 @@ def request(url, access_token, params={}):
 def generate_token(username, password):
     logger.info("Generating new token using basic auth.")
 
-    encoded = base64.b64encode(bytes('{}:{}'.format(username, password),
-                                     'utf-8')) \
-                    .decode('utf-8')
+    credentials = f"{username}:{password}"
+    encoded = base64.b64encode(credentials.encode('utf-8')).decode('utf-8')
 
     response = requests.get(
         '{}/login'.format(BASE_URL),
@@ -85,7 +86,7 @@ def parse_datetime(datetime):
     return dt.isoformat('T') + 'Z'
 
 
-def parse_performance(result, extra_fields):
+def parse_performance(result: Dict[str, Any], extra_fields: Dict[str, Any]) -> Dict[str, Any]:
     metrics = result.get('metrics', {})
     metadata = result.get('metadata', {})
 
