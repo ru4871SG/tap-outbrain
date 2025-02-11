@@ -30,13 +30,11 @@ DEFAULT_STATE = {
 
 DEFAULT_START_DATE = '2016-08-01'
 
-
 def giveup(error):
     logger.error(error.response.text)
     response = error.response
     return not (response.status_code == 429 or
                 response.status_code >= 500)
-
 
 @backoff.on_exception(backoff.constant,
                       (requests.exceptions.RequestException),
@@ -61,7 +59,6 @@ def request(url, access_token, params={}):
     response.raise_for_status()
     return response
 
-
 def generate_token(username, password):
     logger.info("Generating new token using basic auth.")
 
@@ -77,14 +74,9 @@ def generate_token(username, password):
 
     return response.json().get('OB-TOKEN-V1')
 
-
 def parse_datetime(datetime):
     dt = dateutil.parser.parse(datetime)
-
-    # TODO the assumption is that the timestamp comes in in UTC, but that
-    #      may not be true. verify w/ outbrain.
     return dt.isoformat('T') + 'Z'
-
 
 def parse_performance(result: Dict[str, Any], extra_fields: Dict[str, Any]) -> Dict[str, Any]:
     metrics = result.get('metrics', {})
@@ -104,7 +96,6 @@ def parse_performance(result: Dict[str, Any], extra_fields: Dict[str, Any]) -> D
     to_return.update(extra_fields)
 
     return to_return
-
 
 def get_date_ranges(start, end, interval_in_days):
     if start > end:
@@ -126,8 +117,7 @@ def get_date_ranges(start, end, interval_in_days):
 
     return to_return
 
-
-def sync_campaign_performance(state, access_token, account_id, campaign_id):
+def sync_campaign_performance(state, access_token, account_id, campaign_id, config):
     return sync_performance(
         state,
         access_token,
@@ -135,11 +125,11 @@ def sync_campaign_performance(state, access_token, account_id, campaign_id):
         'campaign_performance',
         campaign_id,
         {'campaignId': campaign_id},
-        {'campaignId': campaign_id})
-
+        {'campaignId': campaign_id},
+        config)
 
 def sync_link_performance(state, access_token, account_id, campaign_id,
-                          link_id):
+                          link_id, config):
     return sync_performance(
         state,
         access_token,
@@ -148,11 +138,11 @@ def sync_link_performance(state, access_token, account_id, campaign_id,
         link_id,
         {'promotedLinkId': link_id},
         {'campaignId': campaign_id,
-         'linkId': link_id})
-
+         'linkId': link_id},
+        config)
 
 def sync_performance(state, access_token, account_id, table_name, state_sub_id,
-                     extra_params, extra_persist_fields):
+                     extra_params, extra_persist_fields, config):
     """
     This function is heavily parameterized as it is used to sync performance
     both based on campaign ID alone, and by campaign ID and link ID.
@@ -163,27 +153,20 @@ def sync_performance(state, access_token, account_id, table_name, state_sub_id,
     - `table_name`: the table name to use. At present, one of
                     `campaign_performance` or `link_performance`.
     - `state_sub_id`: the id to use within the state map to identify this
-                      sub-object. For example,
-
-                        state['link_performance'][link_id]
-
-                      is used for the `link_performance` table.
+                      sub-object.
     - `extra_params`: extra params sent to the Outbrain API
     - `extra_persist_fields`: extra fields pushed into the destination data.
-                              For example:
-
-                                {'campaignId': '000b...',
-                                 'promotedLinkId': '000a...'}
-
-                              is used for `link_performance`.
+    - `config`: configuration dictionary containing start_date and end_date
     """
-    # sync 2 days before last saved date, or DEFAULT_START_DATE
     from_date = datetime.datetime.strptime(
         state.get(table_name, {})
              .get(state_sub_id, DEFAULT_START_DATE),
         '%Y-%m-%d').date() - datetime.timedelta(days=2)
 
-    to_date = datetime.date.today()
+    # Use end_date from config if provided, otherwise use today's date
+    to_date = datetime.datetime.strptime(config.get('end_date'), '%Y-%m-%d').date() \
+              if config.get('end_date') \
+              else datetime.date.today()
 
     interval_in_days = 100
 
@@ -224,13 +207,12 @@ def sync_performance(state, access_token, account_id, table_name, state_sub_id,
 
         singer.write_records(table_name, performance)
 
-        last_record = performance[-1]
-        new_from_date = last_record.get('fromDate')
+        if performance:
+            last_record = performance[-1]
+            new_from_date = last_record.get('fromDate')
 
-        state[table_name][state_sub_id] = new_from_date
-        singer.write_state(state)
-
-        from_date = new_from_date
+            state[table_name][state_sub_id] = new_from_date
+            singer.write_state(state)
 
         if last_request_start is not None and \
            (time.time() - last_request_end) < 30:
@@ -241,7 +223,6 @@ def sync_performance(state, access_token, account_id, table_name, state_sub_id,
                 .format(to_sleep))
             time.sleep(to_sleep)
 
-
 def parse_campaign(campaign):
     if campaign.get('budget') is not None:
         campaign['budget']['creationTime'] = parse_datetime(
@@ -251,8 +232,7 @@ def parse_campaign(campaign):
 
     return campaign
 
-
-def sync_campaigns(state, access_token, account_id):
+def sync_campaigns(state, access_token, account_id, config):
     logger.info('Syncing campaigns.')
 
     start = time.time()
@@ -270,16 +250,8 @@ def sync_campaigns(state, access_token, account_id):
     campaigns_done = 0
 
     for campaign in campaigns:
-        # commenting this for now because it makes the integration take too
-        # long for users with many campaigns. outbrain rate limits requests
-        # to the reporting API at about 2 requests per minute. if we can
-        # get them to raise that, this can be uncommented and will work great.
-        #    - Connor (@cmcarthur on Github)
-        #
-        # sync_links(state, access_token, account_id, campaign.get('id'))
-
         sync_campaign_performance(state, access_token, account_id,
-                                  campaign.get('id'))
+                                  campaign.get('id'), config)
 
         campaigns_done = campaigns_done + 1
 
@@ -289,15 +261,13 @@ def sync_campaigns(state, access_token, account_id):
 
     logger.info('Done!')
 
-
 def parse_link(link):
     link['creationTime'] = parse_datetime(link.get('creationTime'))
     link['lastModified'] = parse_datetime(link.get('lastModified'))
 
     return link
 
-
-def sync_links(state, access_token, account_id, campaign_id):
+def sync_links(state, access_token, account_id, campaign_id, config):
     processed_count = 0
     total_count = -1
     fully_synced_count = 0
@@ -333,7 +303,7 @@ def sync_links(state, access_token, account_id, campaign_id):
                     total_count))
 
             sync_link_performance(state, access_token, account_id, campaign_id,
-                                  link.get('id'))
+                                  link.get('id'), config)
 
             fully_synced_count = fully_synced_count + 1
 
@@ -344,6 +314,36 @@ def sync_links(state, access_token, account_id, campaign_id):
 
     logger.info('Done syncing links for campaign {}.'.format(campaign_id))
 
+def validate_config(config):
+    required_keys = ['username', 'password', 'account_id', 'start_date']
+    missing_keys = []
+    null_keys = []
+    has_errors = False
+
+    for required_key in required_keys:
+        if required_key not in config:
+            missing_keys.append(required_key)
+        elif config.get(required_key) is None:
+            null_keys.append(required_key)
+
+    if missing_keys:
+        logger.fatal("Config is missing keys: {}".format(", ".join(missing_keys)))
+        has_errors = True
+
+    if null_keys:
+        logger.fatal("Config has null keys: {}".format(", ".join(null_keys)))
+        has_errors = True
+
+    # Validate end_date format if provided
+    if config.get('end_date'):
+        try:
+            datetime.datetime.strptime(config['end_date'], '%Y-%m-%d')
+        except ValueError:
+            logger.fatal("end_date must be in YYYY-MM-DD format")
+            has_errors = True
+
+    if has_errors:
+        raise RuntimeError
 
 def do_sync(args):
     global DEFAULT_START_DATE
@@ -351,31 +351,13 @@ def do_sync(args):
 
     with open(args.config) as config_file:
         config = json.load(config_file)
-    missing_keys = []
-    if 'username' not in config:
-        missing_keys.append('username')
-    else:
-        username = config['username']
 
-    if 'password' not in config:
-        missing_keys.append('password')
-    else:
-        password = config['password']
-
-    if 'account_id' not in config:
-        missing_keys.append('account_id')
-    else:
-        account_id = config['account_id']
-
-    if 'start_date' not in config:
-        missing_keys.append('start_date')
-    else:
-        # only want the date
-        DEFAULT_START_DATE = config['start_date'][:10]
-
-    if len(missing_keys) > 0:
-        logger.fatal("Missing {}.".format(", ".join(missing_keys)))
-        raise RuntimeError
+    validate_config(config)
+    
+    username = config['username']
+    password = config['password']
+    account_id = config['account_id']
+    DEFAULT_START_DATE = config['start_date'][:10]
 
     access_token = config.get('access_token')
 
@@ -385,7 +367,6 @@ def do_sync(args):
     if access_token is None:
         logger.fatal("Failed to generate a new access token.")
         raise RuntimeError
-
 
     singer.write_schema('campaigns',
                         schemas.campaign,
@@ -400,8 +381,7 @@ def do_sync(args):
                         schemas.link_performance,
                         key_properties=["campaignId", "linkId", "fromDate"])
 
-    sync_campaigns(state, access_token, account_id)
-
+    sync_campaigns(state, access_token, account_id, config)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -413,8 +393,11 @@ def main():
 
     args = parser.parse_args()
 
-    do_sync(args)
-
+    try:
+        do_sync(args)
+    except RuntimeError:
+        logger.fatal("Run failed.")
+        exit(1)
 
 if __name__ == '__main__':
     main()
