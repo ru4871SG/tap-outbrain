@@ -229,8 +229,16 @@ def parse_campaign(campaign):
             campaign.get('budget').get('creationTime'))
         campaign['budget']['lastModified'] = parse_datetime(
             campaign.get('budget').get('lastModified'))
-
-    return campaign
+    
+    return {
+        'id': campaign.get('id'),
+        'name': campaign.get('name'),
+        'campaignOnAir': campaign.get('liveStatus', {}).get('campaignOnAir'),
+        'onAirReason': campaign.get('liveStatus', {}).get('onAirReason'),
+        'enabled': campaign.get('enabled'),
+        'budget': campaign.get('budget'),
+        'cpc': campaign.get('cpc')
+    }
 
 def sync_campaigns(state, access_token, account_id, config):
     logger.info('Syncing campaigns.')
