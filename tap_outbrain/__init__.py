@@ -78,11 +78,26 @@ def parse_datetime(datetime):
     dt = dateutil.parser.parse(datetime)
     return dt.isoformat('T') + 'Z'
 
-def parse_performance(result: Dict[str, Any], extra_fields: Dict[str, Any]) -> Dict[str, Any]:
-    metrics = result.get('metrics', {})
-    metadata = result.get('metadata', {})
+def decimal_to_float(obj):
+    """Recursively convert Decimals to floats."""
+    if isinstance(obj, dict):
+        return {k: decimal_to_float(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [decimal_to_float(x) for x in obj]
+    elif isinstance(obj, Decimal):
+        return float(obj)
+    return obj
 
-    to_return = {
+def parse_performance(result: Dict[str, Any], extra_fields: Dict[str, Any]) -> Dict[str, Any]:
+    """Parse performance metrics with decimal handling."""
+    # Convert nested decimals in both result and extra_fields
+    converted_result = decimal_to_float(result)
+    converted_extra = decimal_to_float(extra_fields)
+    
+    metrics = converted_result.get('metrics', {})
+    metadata = converted_result.get('metadata', {})
+
+    return {
         'fromDate': metadata.get('fromDate'),
         'impressions': int(metrics.get('impressions', 0)),
         'clicks': int(metrics.get('clicks', 0)),
@@ -92,10 +107,9 @@ def parse_performance(result: Dict[str, Any], extra_fields: Dict[str, Any]) -> D
         'conversions': int(metrics.get('conversions', 0)),
         'conversionRate': float(metrics.get('conversionRate', 0.0)),
         'cpa': float(metrics.get('cpa', 0.0)),
+        # Add converted extra fields
+        **converted_extra
     }
-    to_return.update(extra_fields)
-
-    return to_return
 
 def get_date_ranges(start, end, interval_in_days):
     if start > end:
@@ -224,21 +238,45 @@ def sync_performance(state, access_token, account_id, table_name, state_sub_id,
             time.sleep(to_sleep)
 
 def parse_campaign(campaign):
-    if campaign.get('budget') is not None:
-        campaign['budget']['creationTime'] = parse_datetime(
-            campaign.get('budget').get('creationTime'))
-        campaign['budget']['lastModified'] = parse_datetime(
-            campaign.get('budget').get('lastModified'))
+    """Parse campaign data with proper type handling."""
+    # Convert all Decimals first (including nested ones)
+    campaign = decimal_to_float(campaign)
     
-    return {
-        'id': campaign.get('id'),
-        'name': campaign.get('name'),
-        'campaignOnAir': campaign.get('liveStatus', {}).get('campaignOnAir'),
-        'onAirReason': campaign.get('liveStatus', {}).get('onAirReason'),
-        'enabled': campaign.get('enabled'),
-        'budget': campaign.get('budget'),
-        'cpc': campaign.get('cpc')
+    logger.info("Raw campaign data:")
+    logger.info(json.dumps(campaign, default=str, indent=2))
+
+    # Handle budget separately with null checks
+    budget = None
+    if campaign.get('budget'):
+        budget = {
+            "id": str(campaign['budget'].get('id', '')),
+            "name": str(campaign['budget'].get('name', '')),
+            "amount": float(campaign['budget'].get('amount', 0.0)),
+            "currency": str(campaign['budget'].get('currency', '')),
+            "creationTime": parse_datetime(campaign['budget'].get('creationTime')),
+            "lastModified": parse_datetime(campaign['budget'].get('lastModified')),
+            "type": str(campaign['budget'].get('type', ''))
+        }
+
+    # Build result with explicit type casting
+    result = {
+        'id': str(campaign.get('id', '')),  # Ensure string type
+        'name': str(campaign.get('name', '')),
+        'campaignOnAir': bool(campaign.get('liveStatus', {}).get('campaignOnAir', False)),
+        'onAirReason': str(campaign.get('liveStatus', {}).get('onAirReason', '')),
+        'enabled': bool(campaign.get('enabled', False)),
+        'budget': budget,
+        'cpc': float(campaign.get('cpc', 0.0)),
+        'currency': str(campaign.get('currency', 'USD')),  # Add missing field
+        'status': str(campaign.get('status', '')),
+        'startDate': parse_datetime(campaign.get('startDate')) or None,
+        'endDate': parse_datetime(campaign.get('endDate')) or None
     }
+
+    logger.info("Processed campaign data - checking:")
+    logger.info(json.dumps(result, default=str, indent=2))
+    
+    return result
 
 def sync_campaigns(state, access_token, account_id, config):
     logger.info('Syncing campaigns.')
@@ -248,32 +286,46 @@ def sync_campaigns(state, access_token, account_id, config):
         '{}/marketers/{}/campaigns'.format(BASE_URL, account_id),
         access_token, {})
 
-    campaigns = [parse_campaign(campaign) for campaign
-                 in response.json().get('campaigns', [])]
+    raw_campaigns = response.json().get('campaigns', [])
+    logger.info(f"Got {len(raw_campaigns)} campaigns from API")
+    
+    campaigns = []
+    for campaign in raw_campaigns:
+        try:
+            parsed = parse_campaign(campaign)
+            campaigns.append(parsed)
+        except Exception as e:
+            logger.error(f"Error parsing campaign: {e}")
+            logger.error(f"Problematic campaign data: {json.dumps(campaign, default=str)}")
 
+    logger.info("About to write records")
     singer.write_records('campaigns', campaigns)
 
-    logger.info('Done in {} sec.'.format(time.time() - start))
-
-    campaigns_done = 0
-
-    for campaign in campaigns:
-        sync_campaign_performance(state, access_token, account_id,
-                                  campaign.get('id'), config)
-
-        campaigns_done = campaigns_done + 1
-
-        logger.info(
-            '{} of {} campaigns fully synced.'
-            .format(campaigns_done, len(campaigns)))
-
-    logger.info('Done!')
 
 def parse_link(link):
+    """Parse a promoted link record with decimal handling."""
+    # Convert all Decimals first
+    link = decimal_to_float(link)
+    
+    # Handle datetime fields
     link['creationTime'] = parse_datetime(link.get('creationTime'))
     link['lastModified'] = parse_datetime(link.get('lastModified'))
-
-    return link
+    
+    # Ensure all string fields are properly encoded
+    return {
+        'id': str(link.get('id')),
+        'name': str(link.get('name', '')),
+        'url': str(link.get('url', '')),
+        'creationTime': link.get('creationTime'),
+        'lastModified': link.get('lastModified'),
+        'isActive': bool(link.get('isActive', False)),
+        'cpc': float(link.get('cpc', 0.0)),
+        'campaignId': str(link.get('campaignId', '')),
+        'content': decimal_to_float(link.get('content', {})),
+        'approvalStatus': str(link.get('approvalStatus', '')),
+        'thumbnailUrl': str(link.get('thumbnailUrl', '')),
+        'isMarkedForRemoval': bool(link.get('isMarkedForRemoval', False))
+    }
 
 def sync_links(state, access_token, account_id, campaign_id, config):
     processed_count = 0
