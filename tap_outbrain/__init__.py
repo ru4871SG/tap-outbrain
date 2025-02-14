@@ -224,11 +224,21 @@ def sync_performance(state, access_token, account_id, table_name, state_sub_id,
             time.sleep(to_sleep)
 
 def parse_campaign(campaign):
+    # Helper function to handle potential Decimal values
+    def convert_decimal(value):
+        if isinstance(value, Decimal):
+            return float(value)
+        return value
+
+    # Handle budget dates and values
     if campaign.get('budget') is not None:
         campaign['budget']['creationTime'] = parse_datetime(
             campaign.get('budget').get('creationTime'))
         campaign['budget']['lastModified'] = parse_datetime(
             campaign.get('budget').get('lastModified'))
+        # Convert any Decimal values in budget
+        if 'amount' in campaign['budget']:
+            campaign['budget']['amount'] = convert_decimal(campaign['budget']['amount'])
     
     return {
         'id': campaign.get('id'),
@@ -237,7 +247,7 @@ def parse_campaign(campaign):
         'onAirReason': campaign.get('liveStatus', {}).get('onAirReason'),
         'enabled': campaign.get('enabled'),
         'budget': campaign.get('budget'),
-        'cpc': campaign.get('cpc')
+        'cpc': convert_decimal(campaign.get('cpc'))  # Also convert cpc
     }
 
 def sync_campaigns(state, access_token, account_id, config):
