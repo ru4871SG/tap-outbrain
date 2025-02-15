@@ -74,9 +74,15 @@ def generate_token(username, password):
 
     return response.json().get('OB-TOKEN-V1')
 
-def parse_datetime(datetime):
-    dt = dateutil.parser.parse(datetime)
-    return dt.isoformat('T') + 'Z'
+def parse_datetime(datetime_str):
+    """Parse datetime string to ISO format with None handling."""
+    if datetime_str is None:
+        return None
+    try:
+        dt = dateutil.parser.parse(datetime_str)
+        return dt.isoformat('T') + 'Z'
+    except (ValueError, TypeError):
+        return None
 
 def decimal_to_float(obj):
     """Recursively convert Decimals to floats."""
@@ -242,7 +248,7 @@ def parse_campaign(campaign):
     # Convert all Decimals first (including nested ones)
     campaign = decimal_to_float(campaign)
     
-    logger.info("Raw campaign data:")
+    logger.info("Raw campaign data - checking:")
     logger.info(json.dumps(campaign, default=str, indent=2))
 
     # Handle budget separately with null checks
