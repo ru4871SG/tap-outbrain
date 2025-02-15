@@ -244,26 +244,29 @@ def sync_performance(state, access_token, account_id, table_name, state_sub_id,
             time.sleep(to_sleep)
 
 def parse_campaign(campaign):
-    """Parse campaign data with proper type handling."""
-    # Convert all Decimals first (including nested ones)
-    campaign = decimal_to_float(campaign)
-    
+    """Parse campaign data while preserving Decimal types."""
     logger.info("Raw campaign data - checking:")
     logger.info(json.dumps(campaign, default=str, indent=2))
-
-    # Handle budget separately with null checks
+    
+    # Handle budget separately but preserve Decimal types
     budget = None
     if campaign.get('budget'):
-        budget = {
-            "id": str(campaign['budget'].get('id', '')),
-            "name": str(campaign['budget'].get('name', '')),
-            "amount": float(campaign['budget'].get('amount', 0.0)),
-            "currency": str(campaign['budget'].get('currency', '')),
-            "creationTime": parse_datetime(campaign['budget'].get('creationTime')),
-            "lastModified": parse_datetime(campaign['budget'].get('lastModified')),
-            "type": str(campaign['budget'].get('type', ''))
-        }
-
+        try:
+            budget_raw = campaign['budget']
+            budget = {
+                'id': str(budget_raw.get('id', '')),
+                'name': str(budget_raw.get('name', '')),
+                'amount': budget_raw.get('amount'),
+                'currency': str(budget_raw.get('currency', '')),
+                'creationTime': parse_datetime(budget_raw.get('creationTime')),
+                'lastModified': parse_datetime(budget_raw.get('lastModified')),
+                'type': str(budget_raw.get('type', ''))
+            }
+            logger.info("Budget after processing:")
+            logger.info(json.dumps(budget, default=str, indent=2))
+        except Exception as e:
+            logger.error(f"Error processing budget: {e}")
+            logger.error(f"Raw budget data: {json.dumps(campaign['budget'], default=str)}")
     # Build result with explicit type casting
     result = {
         'id': str(campaign.get('id', '')),  # Ensure string type
@@ -272,8 +275,8 @@ def parse_campaign(campaign):
         'onAirReason': str(campaign.get('liveStatus', {}).get('onAirReason', '')),
         'enabled': bool(campaign.get('enabled', False)),
         'budget': budget,
-        'cpc': float(campaign.get('cpc', 0.0)),
-        'currency': str(campaign.get('currency', 'USD')),  # Add missing field
+        'cpc': campaign.get('cpc'),
+        'currency': str(campaign.get('currency', 'USD')),  # Add missing fields, starting from 'currency'
         'status': str(campaign.get('status', '')),
         'startDate': parse_datetime(campaign.get('startDate')) or None,
         'endDate': parse_datetime(campaign.get('endDate')) or None
@@ -281,7 +284,7 @@ def parse_campaign(campaign):
 
     logger.info("Processed campaign data - checking:")
     logger.info(json.dumps(result, default=str, indent=2))
-    
+
     return result
 
 def sync_campaigns(state, access_token, account_id, config):
