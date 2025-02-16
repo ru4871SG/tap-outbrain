@@ -162,13 +162,13 @@ campaign = {
                                     'Budget, i.e. "2014-01-15 12:24:01"')
                 },
                 'startDate': {
-                    'type': 'string',
+                    'type': ['string', 'null'],  # Allow both string and null
                     'format': 'date',
                     'description': ('The date this Budget is scheduled to '
                                     'begin spending, i.e. "2014-01-15"')
                 },
                 'endDate': {
-                    'type': 'string',
+                    'type': ['string', 'null'],  # Allow both string and null
                     'format': 'date',
                     'description': ('The date this Budget is scheduled to '
                                     'stop spending. If runForever is true '
@@ -219,12 +219,12 @@ campaign = {
             'description': 'The current status of the campaign'
         },
         'startDate': {
-            'type': 'string',
+            'type': ['string', 'null'],  # Allow both string and null
             'format': 'date',
             'description': 'The date when the campaign starts'
         },
         'endDate': {
-            'type': 'string',
+            'type': ['string', 'null'],  # Allow both string and null
             'format': 'date',
             'description': 'The date when the campaign ends'
         }
