@@ -209,6 +209,24 @@ campaign = {
             'description': ('Cost per monetized user action (for example '
                             'cost per click). See Currencies for valid '
                             'cost values')
+        },
+        'currency': {
+            'type': 'string',
+            'description': 'The currency used for the campaign, default is USD'
+        },
+        'status': {
+            'type': 'string',
+            'description': 'The current status of the campaign'
+        },
+        'startDate': {
+            'type': 'string',
+            'format': 'date-time',
+            'description': 'The date when the campaign starts'
+        },
+        'endDate': {
+            'type': 'string',
+            'format': 'date-time',
+            'description': 'The date when the campaign ends'
         }
     }
 }
