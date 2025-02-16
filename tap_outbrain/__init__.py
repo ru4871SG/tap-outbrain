@@ -303,6 +303,13 @@ def sync_campaigns(state, access_token, account_id, config):
         try:
             parsed = parse_campaign(campaign)
             campaigns.append(parsed)
+            
+            # Sync performance data for each campaign
+            campaign_id = campaign.get('id')
+            if campaign_id:
+                logger.info(f"Syncing performance data for campaign {campaign_id}")
+                sync_campaign_performance(state, access_token, account_id, campaign_id, config)
+                
         except Exception as e:
             logger.error(f"Error parsing campaign: {e}")
             logger.error(f"Problematic campaign data: {json.dumps(campaign, default=str)}")
