@@ -220,12 +220,12 @@ campaign = {
         },
         'startDate': {
             'type': 'string',
-            'format': 'date-time',
+            'format': 'date',
             'description': 'The date when the campaign starts'
         },
         'endDate': {
             'type': 'string',
-            'format': 'date-time',
+            'format': 'date',
             'description': 'The date when the campaign ends'
         }
     }
