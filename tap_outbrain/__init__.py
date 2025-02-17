@@ -24,8 +24,8 @@ logger = singer.get_logger()
 BASE_URL = 'https://api.outbrain.com/amplify/v0.1'
 
 DEFAULT_STATE = {
-    'campaign_performance': {},
-    'link_performance': {}
+    'campaign_performance_outbrain': {},
+    'link_performance_outbrain': {}
 }
 
 DEFAULT_START_DATE = '2016-08-01'
@@ -142,7 +142,7 @@ def sync_campaign_performance(state, access_token, account_id, campaign_id, conf
         state,
         access_token,
         account_id,
-        'campaign_performance',
+        'campaign_performance_outbrain',
         campaign_id,
         {'campaignId': campaign_id},
         {'campaignId': campaign_id},
@@ -154,7 +154,7 @@ def sync_link_performance(state, access_token, account_id, campaign_id,
         state,
         access_token,
         account_id,
-        'link_performance',
+        'link_performance_outbrain',
         link_id,
         {'promotedLinkId': link_id},
         {'campaignId': campaign_id,
@@ -315,7 +315,7 @@ def sync_campaigns(state, access_token, account_id, config):
             logger.error(f"Problematic campaign data: {json.dumps(campaign, default=str)}")
 
     logger.info("About to write records")
-    singer.write_records('campaigns', campaigns)
+    singer.write_records('campaigns_outbrain', campaigns)
 
 
 def parse_link(link):
@@ -367,7 +367,7 @@ def sync_links(state, access_token, account_id, campaign_id, config):
         links = [parse_link(link) for link
                  in response.json().get('promotedLinks', [])]
 
-        singer.write_records('links', links)
+        singer.write_records('links_outbrain', links)
 
         total_count = response.json().get('totalCount')
         processed_count = processed_count + len(links)
@@ -444,16 +444,16 @@ def do_sync(args):
         logger.fatal("Failed to generate a new access token.")
         raise RuntimeError
 
-    singer.write_schema('campaigns',
+    singer.write_schema('campaigns_outbrain',
                         schemas.campaign,
                         key_properties=["id"])
-    singer.write_schema('campaign_performance',
+    singer.write_schema('campaign_performance_outbrain',
                         schemas.campaign_performance,
                         key_properties=["campaignId", "fromDate"])
-    singer.write_schema('links',
+    singer.write_schema('links_outbrain',
                         schemas.link,
                         key_properties=["id"])
-    singer.write_schema('link_performance',
+    singer.write_schema('link_performance_outbrain',
                         schemas.link_performance,
                         key_properties=["campaignId", "linkId", "fromDate"])
 
