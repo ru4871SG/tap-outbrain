@@ -206,7 +206,7 @@ def sync_performance(state, access_token, account_id, table_name, state_sub_id,
             'from': date_range.get('from_date'),
             'to': date_range.get('to_date'),
             'breakdown': 'daily',
-            'limit': 100,
+            'limit': 1000,
             'sort': '+fromDate',
             'includeArchivedCampaigns': True,
         }
