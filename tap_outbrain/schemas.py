@@ -3,6 +3,7 @@ link = {
     'properties': {
         'id': {
             'type': 'string',
+            'maxLength': 191,
             'description': ('ID of this PromotedLink, i.e. '
                             '"00f4b02153ee75f3c9dc4fc128ab041962"')
         },
@@ -237,11 +238,13 @@ campaign_performance = {
     'properties': {
         'campaignId': {
             'type': 'string',
+            'maxLength': 191,
             'description': ('The campaign ID plus the start date (day) '
                             'for this record.')
         },
         'fromDate': {
             'type': 'string',
+            'maxLength': 191,
             'format': 'date',
             'description': 'The start date for this record.'
         },
