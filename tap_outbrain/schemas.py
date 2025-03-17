@@ -7,6 +7,10 @@ link = {
             'description': ('ID of this PromotedLink, i.e. '
                             '"00f4b02153ee75f3c9dc4fc128ab041962"')
         },
+        'account_id': {
+            'type': 'string',
+            'description': 'Outbrain Account ID'
+        },
         'campaignId': {
             'type': 'string',
             'description': ('The ID of the campaign to which the '
@@ -93,6 +97,10 @@ campaign = {
         'name': {
             'type': 'string',
             'description': 'Campaign name'
+        },
+        'account_id': {
+            'type': 'string',
+            'description': 'Outbrain Account ID'
         },
         'campaignOnAir': {
             'type': 'boolean',
@@ -242,6 +250,11 @@ campaign_performance = {
             'description': ('The campaign ID plus the start date (day) '
                             'for this record.')
         },
+        'account_id': {
+            'type': 'string',
+            'maxLength': 191,
+            'description': 'Outbrain Account ID'
+        },
         'fromDate': {
             'type': 'string',
             'maxLength': 191,
@@ -305,6 +318,10 @@ link_performance = {
         'linkId': {
             'type': 'string',
             'description': ('The link ID for this record.')
+        },
+        'account_id': {
+            'type': 'string',
+            'description': 'Outbrain Account ID'
         },
         'fromDate': {
             'type': 'string',
