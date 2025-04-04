@@ -114,6 +114,7 @@ def parse_performance(result: Dict[str, Any], extra_fields: Dict[str, Any]) -> D
         'conversionRate': float(metrics.get('conversionRate', 0.0)),
         'cpa': float(metrics.get('cpa', 0.0)),
         'account_id': extra_fields.get('account_id', ''),
+        'account_name': extra_fields.get('account_name', ''),
         # Add converted extra fields
         **converted_extra
     }
@@ -138,7 +139,7 @@ def get_date_ranges(start, end, interval_in_days):
 
     return to_return
 
-def sync_campaign_performance(state, access_token, account_id, campaign_id, config):
+def sync_campaign_performance(state, access_token, account_id, campaign_id, account_name, config):
     return sync_performance(
         state,
         access_token,
@@ -146,7 +147,7 @@ def sync_campaign_performance(state, access_token, account_id, campaign_id, conf
         'campaign_performance_outbrain',
         campaign_id,
         {'campaignId': campaign_id},
-        {'campaignId': campaign_id, 'account_id': account_id},
+        {'campaignId': campaign_id, 'account_id': account_id, 'account_name': account_name},
         config)
 
 def sync_link_performance(state, access_token, account_id, campaign_id,
@@ -293,6 +294,21 @@ def parse_campaign(campaign, account_id):
 def sync_campaigns(state, access_token, account_id, config):
     logger.info('Syncing campaigns.')
 
+    account_name = ""
+    try:
+        marketers_response = request(
+            '{}/marketers'.format(BASE_URL),
+            access_token)
+        
+        marketers = marketers_response.json().get('marketers', [])
+        for marketer in marketers:
+            if marketer.get('id') == account_id:
+                account_name = marketer.get('name', '')
+                logger.info(f"Found account name: {account_name} for account ID: {account_id}")
+                break
+    except Exception as e:
+        logger.error(f"Error fetching account name: {e}")
+
     start = time.time()
     response = request(
         '{}/marketers/{}/campaigns'.format(BASE_URL, account_id),
@@ -312,8 +328,8 @@ def sync_campaigns(state, access_token, account_id, config):
             campaign_id = campaign.get('id')
             if campaign_id:
                 logger.info(f"Syncing performance data for campaign {campaign_id}")
-                # The account_id is already passed to sync_campaign_performance
-                sync_campaign_performance(state, access_token, account_id, campaign_id, config)
+                sync_campaign_performance(state, access_token, account_id, campaign_id, account_name, config)
+
                 
         except Exception as e:
             logger.error(f"Error parsing campaign: {e}")

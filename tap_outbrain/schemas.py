@@ -102,6 +102,10 @@ campaign = {
             'type': 'string',
             'description': 'Outbrain Account ID'
         },
+        'account_name': {
+            'type': 'string',
+            'description': 'Outbrain Account Name'
+        },
         'campaignOnAir': {
             'type': 'boolean',
             'description': ('Is the campaign on air, same as campaignOnAir '
@@ -254,6 +258,11 @@ campaign_performance = {
             'type': 'string',
             'maxLength': 191,
             'description': 'Outbrain Account ID'
+        },
+        'account_name': {
+            'type': 'string',
+            'maxLength': 191,
+            'description': 'Outbrain Account Name'
         },
         'fromDate': {
             'type': 'string',
