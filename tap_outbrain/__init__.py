@@ -181,7 +181,7 @@ def sync_performance(state, access_token, account_id, table_name, state_sub_id,
     from_date = datetime.datetime.strptime(
         state.get(table_name, {})
              .get(state_sub_id, DEFAULT_START_DATE),
-        '%Y-%m-%d').date() - datetime.timedelta(days=2)
+        '%Y-%m-%d').date() - datetime.timedelta(days=0)
 
     # Use end_date from config if provided, otherwise use today's date
     to_date = datetime.datetime.strptime(config.get('end_date'), '%Y-%m-%d').date() \
