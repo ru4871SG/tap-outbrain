@@ -113,6 +113,8 @@ def parse_performance(result: Dict[str, Any], extra_fields: Dict[str, Any]) -> D
         'conversions': int(metrics.get('conversions', 0)),
         'conversionRate': float(metrics.get('conversionRate', 0.0)),
         'cpa': float(metrics.get('cpa', 0.0)),
+        'account_id': extra_fields.get('account_id', ''),
+        'account_name': extra_fields.get('account_name', ''),
         # Add converted extra fields
         **converted_extra
     }
@@ -137,7 +139,7 @@ def get_date_ranges(start, end, interval_in_days):
 
     return to_return
 
-def sync_campaign_performance(state, access_token, account_id, campaign_id, config):
+def sync_campaign_performance(state, access_token, account_id, campaign_id, account_name, config):
     return sync_performance(
         state,
         access_token,
@@ -145,7 +147,7 @@ def sync_campaign_performance(state, access_token, account_id, campaign_id, conf
         'campaign_performance_outbrain',
         campaign_id,
         {'campaignId': campaign_id},
-        {'campaignId': campaign_id},
+        {'campaignId': campaign_id, 'account_id': account_id, 'account_name': account_name},
         config)
 
 def sync_link_performance(state, access_token, account_id, campaign_id,
@@ -158,7 +160,8 @@ def sync_link_performance(state, access_token, account_id, campaign_id,
         link_id,
         {'promotedLinkId': link_id},
         {'campaignId': campaign_id,
-         'linkId': link_id},
+         'linkId': link_id,
+         'account_id': account_id},
         config)
 
 def sync_performance(state, access_token, account_id, table_name, state_sub_id,
@@ -243,7 +246,7 @@ def sync_performance(state, access_token, account_id, table_name, state_sub_id,
                 .format(to_sleep))
             time.sleep(to_sleep)
 
-def parse_campaign(campaign):
+def parse_campaign(campaign, account_id):
     """Parse campaign data while preserving Decimal types."""
     logger.info("Raw campaign data - checking:")
     logger.info(json.dumps(campaign, default=str, indent=2))
@@ -279,7 +282,8 @@ def parse_campaign(campaign):
         'currency': str(campaign.get('currency', 'USD')),  # Add missing fields, starting from 'currency'
         'status': str(campaign.get('status', '')),
         'startDate': parse_datetime(campaign.get('startDate')) or None,
-        'endDate': parse_datetime(campaign.get('endDate')) or None
+        'endDate': parse_datetime(campaign.get('endDate')) or None,
+        'account_id': str(account_id)
     }
 
     logger.info("Processed campaign data - checking:")
@@ -289,6 +293,21 @@ def parse_campaign(campaign):
 
 def sync_campaigns(state, access_token, account_id, config):
     logger.info('Syncing campaigns.')
+
+    account_name = ""
+    try:
+        marketers_response = request(
+            '{}/marketers'.format(BASE_URL),
+            access_token)
+        
+        marketers = marketers_response.json().get('marketers', [])
+        for marketer in marketers:
+            if marketer.get('id') == account_id:
+                account_name = marketer.get('name', '')
+                logger.info(f"Found account name: {account_name} for account ID: {account_id}")
+                break
+    except Exception as e:
+        logger.error(f"Error fetching account name: {e}")
 
     start = time.time()
     response = request(
@@ -301,14 +320,16 @@ def sync_campaigns(state, access_token, account_id, config):
     campaigns = []
     for campaign in raw_campaigns:
         try:
-            parsed = parse_campaign(campaign)
+            # Pass account_id to parse_campaign
+            parsed = parse_campaign(campaign, account_id)
             campaigns.append(parsed)
             
             # Sync performance data for each campaign
             campaign_id = campaign.get('id')
             if campaign_id:
                 logger.info(f"Syncing performance data for campaign {campaign_id}")
-                sync_campaign_performance(state, access_token, account_id, campaign_id, config)
+                sync_campaign_performance(state, access_token, account_id, campaign_id, account_name, config)
+
                 
         except Exception as e:
             logger.error(f"Error parsing campaign: {e}")
@@ -318,7 +339,7 @@ def sync_campaigns(state, access_token, account_id, config):
     singer.write_records('campaigns_outbrain', campaigns)
 
 
-def parse_link(link):
+def parse_link(link, account_id):
     """Parse a promoted link record with decimal handling."""
     # Convert all Decimals first
     link = decimal_to_float(link)
@@ -340,7 +361,8 @@ def parse_link(link):
         'content': decimal_to_float(link.get('content', {})),
         'approvalStatus': str(link.get('approvalStatus', '')),
         'thumbnailUrl': str(link.get('thumbnailUrl', '')),
-        'isMarkedForRemoval': bool(link.get('isMarkedForRemoval', False))
+        'isMarkedForRemoval': bool(link.get('isMarkedForRemoval', False)),
+        'account_id': str(account_id)
     }
 
 def sync_links(state, access_token, account_id, campaign_id, config):
@@ -364,7 +386,8 @@ def sync_links(state, access_token, account_id, campaign_id, config):
                 'offset': processed_count
             })
 
-        links = [parse_link(link) for link
+        # Pass account_id to parse_link
+        links = [parse_link(link, account_id) for link
                  in response.json().get('promotedLinks', [])]
 
         singer.write_records('links_outbrain', links)
