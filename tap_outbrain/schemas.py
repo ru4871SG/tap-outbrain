@@ -248,71 +248,46 @@ campaign = {
 campaign_performance = {
     'type': 'object',
     'properties': {
-        'campaignId': {
+        'id': {
             'type': 'string',
-            'maxLength': 191,
-            'description': ('The campaign ID plus the start date (day) '
-                            'for this record.')
+            'description': 'Campaign ID'
+        },
+        'name': {
+            'type': 'string',
+            'description': 'Campaign name'
+        },
+        'identifier': {
+            'type': 'string',
+            'description': 'Campaign unique identifier'
+        },
+        'spend': {
+            'type': 'number',
+            'description': 'Total spend for the campaign'
+        },
+        'impressions': {
+            'type': 'integer',
+            'description': 'Total impressions for the campaign'
+        },
+        'clicks': {
+            'type': 'integer',
+            'description': 'Total clicks for the campaign'
+        },
+        'currency': {
+            'type': 'string',
+            'description': 'Currency code'
+        },
+        'start_date': {
+            'type': ['string', 'null'],
+            'format': 'date',
+            'description': 'Campaign start date'
         },
         'account_id': {
             'type': 'string',
-            'maxLength': 191,
             'description': 'Outbrain Account ID'
         },
         'account_name': {
             'type': 'string',
-            'maxLength': 191,
             'description': 'Outbrain Account Name'
-        },
-        'fromDate': {
-            'type': 'string',
-            'maxLength': 191,
-            'format': 'date',
-            'description': 'The start date for this record.'
-        },
-        'impressions': {
-            'type': 'number',
-            'description': ('Total number of PromotedLinks impressions across '
-                            'the entire query range.'),
-        },
-        'clicks': {
-            'type': 'number',
-            'description': ('Total PromotedLinks clicks across the entire '
-                            'query range.'),
-        },
-        'ctr': {
-            'type': 'number',
-            'description': ('The average CTR (Click Through Rate) percentage '
-                            'across the entire query range (clicks / '
-                            'impressions)/100.'),
-        },
-        'spend': {
-            'type': 'number',
-            'description': ('The total amount of money spent across the '
-                            'entire query range.'),
-        },
-        'ecpc': {
-            'type': 'number',
-            'description': ('The effective (calculated) average CPC (Cost Per '
-                            'Click) across the entire query range. '
-                            'Calculated as: (spend / clicks)'),
-        },
-        'conversions': {
-            'type': 'number',
-            'description': ('The total number of conversions calculated '
-                            'across the entire query range.')
-        },
-        'conversionRate': {
-            'type': 'number',
-            'description': ('The average rate of conversions per click '
-                            'percentage across the entire query range. '
-                            'Calculated as: (conversions / clicks)/100')
-        },
-        'cpa': {
-            'type': 'number',
-            'description': ('The average CPA (Cost Per Acquisition) '
-                            'calculated across the entire query range. '
-                            'Calculated as: (spend / conversions)')
         }
     }
 }

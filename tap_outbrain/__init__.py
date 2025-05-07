@@ -140,15 +140,41 @@ def get_date_ranges(start, end, interval_in_days):
     return to_return
 
 def sync_campaign_performance(state, access_token, account_id, campaign_id, account_name, config):
-    return sync_performance(
-        state,
+    """
+    Fetch aggregated campaign performance for a single campaign over the configured date range
+    """
+    params = {
+        'from': config.get('start_date'),
+        'to': config.get('end_date') or datetime.date.today().isoformat(),
+    }
+    # Hit the same non-breakdown endpoint
+    response = request(
+        f"{BASE_URL}/reports/marketers/{account_id}/campaigns",
         access_token,
-        account_id,
-        'campaign_performance_outbrain',
-        campaign_id,
-        {'campaignId': campaign_id},
-        {'campaignId': campaign_id, 'account_id': account_id, 'account_name': account_name},
-        config)
+        params
+    )
+    results = response.json().get('results', [])
+    records = []
+    for c in results:
+        if str(c.get('metadata', {}).get('id')) != str(campaign_id):
+            continue
+        meta   = c['metadata']
+        m      = c['metrics']
+        budget = meta.get('budget', {})
+        records.append({
+            'id'          : meta.get('id'),
+            'name'        : meta.get('name'),
+            'identifier'  : meta.get('identifier'),
+            'spend'       : float(m.get('spend', 0.0)),
+            'impressions' : int(m.get('impressions', 0)),
+            'clicks'      : int(m.get('clicks', 0)),
+            'currency'    : budget.get('currency'),
+            'start_date'  : budget.get('startDate'),
+            'account_id'  : account_id,
+            'account_name': account_name,
+        })
+    singer.write_records('campaign_performance_outbrain', records)
+    return state
 
 def sync_link_performance(state, access_token, account_id, campaign_id,
                           link_id, config):
@@ -472,7 +498,7 @@ def do_sync(args):
                         key_properties=["id"])
     singer.write_schema('campaign_performance_outbrain',
                         schemas.campaign_performance,
-                        key_properties=["campaignId", "fromDate"])
+                        key_properties=["id", "start_date"])
     singer.write_schema('links_outbrain',
                         schemas.link,
                         key_properties=["id"])
