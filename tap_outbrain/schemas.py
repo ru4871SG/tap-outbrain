@@ -281,6 +281,11 @@ campaign_performance = {
             'format': 'date',
             'description': 'Configured start date (from meltano.yml)'
         },
+        'end_date': {
+            'type': 'string',
+            'format': 'date',
+            'description': 'Configured end date (from meltano.yml)'
+        },
         'fromDate': {
             'type': 'string',
             'format': 'date',

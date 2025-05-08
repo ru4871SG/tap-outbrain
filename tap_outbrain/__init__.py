@@ -170,6 +170,7 @@ def sync_campaign_performance(state, access_token, account_id, campaign_id, acco
             'clicks'       : int(m.get('clicks', 0)),
             'currency'     : budget.get('currency'),
             'start_date'   : config.get('start_date'),
+            'end_date'     : config.get('end_date'),
             'fromDate'     : budget.get('startDate'),
             'account_id'   : account_id,
             'account_name' : account_name,
