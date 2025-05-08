@@ -277,9 +277,14 @@ campaign_performance = {
             'description': 'Currency code'
         },
         'start_date': {
-            'type': ['string', 'null'],
+            'type': 'string',
             'format': 'date',
-            'description': 'Campaign start date'
+            'description': 'Configured start date (from meltano.yml)'
+        },
+        'fromDate': {
+            'type': 'string',
+            'format': 'date',
+            'description': 'Actual campaign start date'
         },
         'account_id': {
             'type': 'string',

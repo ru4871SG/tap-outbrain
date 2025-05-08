@@ -162,16 +162,17 @@ def sync_campaign_performance(state, access_token, account_id, campaign_id, acco
         m      = c['metrics']
         budget = meta.get('budget', {})
         records.append({
-            'id'          : meta.get('id'),
-            'name'        : meta.get('name'),
-            'identifier'  : meta.get('identifier'),
-            'spend'       : float(m.get('spend', 0.0)),
-            'impressions' : int(m.get('impressions', 0)),
-            'clicks'      : int(m.get('clicks', 0)),
-            'currency'    : budget.get('currency'),
-            'start_date'  : budget.get('startDate'),
-            'account_id'  : account_id,
-            'account_name': account_name,
+            'id'           : meta.get('id'),
+            'name'         : meta.get('name'),
+            'identifier'   : meta.get('identifier'),
+            'spend'        : float(m.get('spend', 0.0)),
+            'impressions'  : int(m.get('impressions', 0)),
+            'clicks'       : int(m.get('clicks', 0)),
+            'currency'     : budget.get('currency'),
+            'start_date'   : config.get('start_date'),
+            'fromDate'     : budget.get('startDate'),
+            'account_id'   : account_id,
+            'account_name' : account_name,
         })
     singer.write_records('campaign_performance_outbrain', records)
     return state
@@ -498,13 +499,13 @@ def do_sync(args):
                         key_properties=["id"])
     singer.write_schema('campaign_performance_outbrain',
                         schemas.campaign_performance,
-                        key_properties=["id", "start_date"])
-    singer.write_schema('links_outbrain',
-                        schemas.link,
-                        key_properties=["id"])
-    singer.write_schema('link_performance_outbrain',
-                        schemas.link_performance,
-                        key_properties=["campaignId", "linkId", "fromDate"])
+                        key_properties=[])
+    # singer.write_schema('links_outbrain',
+    #                     schemas.link,
+    #                     key_properties=["id"])
+    # singer.write_schema('link_performance_outbrain',
+    #                     schemas.link_performance,
+    #                     key_properties=["campaignId", "linkId", "fromDate"])
 
     sync_campaigns(state, access_token, account_id, config)
 
