@@ -146,6 +146,7 @@ def sync_campaign_performance(state, access_token, account_id, campaign_id, acco
     params = {
         'from': config.get('start_date'),
         'to': config.get('end_date') or datetime.date.today().isoformat(),
+        'limit': 200
     }
     # Hit the same non-breakdown endpoint
     response = request(
@@ -236,16 +237,13 @@ def sync_performance(state, access_token, account_id, table_name, state_sub_id,
         params = {
             'from': date_range.get('from_date'),
             'to': date_range.get('to_date'),
-            'breakdown': 'daily',
-            'limit': 500,
-            'sort': '+fromDate',
-            'includeArchivedCampaigns': True,
+            'limit': 200
         }
         params.update(extra_params)
 
         last_request_start = time.time()
         response = request(
-            '{}/reports/marketers/{}/periodic'.format(BASE_URL, account_id),
+            '{}/reports/marketers/{}/campaigns'.format(BASE_URL, account_id),
             access_token,
             params)
         last_request_end = time.time()
