@@ -248,57 +248,34 @@ campaign = {
 campaign_performance = {
     'type': 'object',
     'properties': {
-        'id': {
-            'type': 'string',
-            'description': 'Campaign ID'
-        },
-        'name': {
-            'type': 'string',
-            'description': 'Campaign name'
-        },
-        'identifier': {
-            'type': 'string',
-            'description': 'Campaign unique identifier'
-        },
-        'spend': {
-            'type': 'number',
-            'description': 'Total spend for the campaign'
-        },
-        'impressions': {
-            'type': 'integer',
-            'description': 'Total impressions for the campaign'
-        },
-        'clicks': {
-            'type': 'integer',
-            'description': 'Total clicks for the campaign'
-        },
-        'currency': {
-            'type': 'string',
-            'description': 'Currency code'
-        },
-        'start_date': {
-            'type': 'string',
-            'format': 'date',
-            'description': 'Configured start date (from meltano.yml)'
-        },
-        'end_date': {
-            'type': 'string',
-            'format': 'date',
-            'description': 'Configured end date (from meltano.yml)'
-        },
-        'fromDate': {
-            'type': 'string',
-            'format': 'date',
-            'description': 'Actual campaign start date'
-        },
-        'account_id': {
-            'type': 'string',
-            'description': 'Outbrain Account ID'
-        },
-        'account_name': {
-            'type': 'string',
-            'description': 'Outbrain Account Name'
-        }
+        'marketer_id': {'type': ['null', 'string'], 'description': 'Marketer ID from Outbrain'},
+        'marketer_name': {'type': ['null', 'string'], 'description': 'Marketer Name from Outbrain'},
+        'campaign_id': {'type': ['null', 'string'], 'description': 'Campaign ID'},
+        'campaign_name': {'type': ['null', 'string'], 'description': 'Campaign Name'},
+        'impressions': {'type': ['null', 'integer'], 'description': 'Total impressions'},
+        'clicks': {'type': ['null', 'integer'], 'description': 'Total clicks'},
+        'totalConversions': {'type': ['null', 'integer'], 'description': 'Total conversions (including view-through)'},
+        'conversions': {'type': ['null', 'integer'], 'description': 'Click-through conversions'},
+        'viewConversions': {'type': ['null', 'integer'], 'description': 'View-through conversions'},
+        'spend': {'type': ['null', 'number'], 'description': 'Total spend'},
+        'ecpc': {'type': ['null', 'number'], 'description': 'Effective Cost Per Click'},
+        'ctr': {'type': ['null', 'number'], 'description': 'Click-Through Rate'},
+        'dstFeeCost': {'type': ['null', 'number'], 'description': 'DST Fee Cost'},
+        'conversionRate': {'type': ['null', 'number'], 'description': 'Conversion Rate (click-through)'},
+        'viewConversionRate': {'type': ['null', 'number'], 'description': 'View-through Conversion Rate'},
+        'cpa': {'type': ['null', 'number'], 'description': 'Cost Per Acquisition (click-through)'},
+        'totalCpa': {'type': ['null', 'number'], 'description': 'Total Cost Per Acquisition'},
+        'totalSumValue': {'type': ['null', 'number'], 'description': 'Total sum of conversion values'},
+        'sumValue': {'type': ['null', 'number'], 'description': 'Sum of click-through conversion values'},
+        'viewSumValue': {'type': ['null', 'number'], 'description': 'Sum of view-through conversion values'},
+        'totalAverageValue': {'type': ['null', 'number'], 'description': 'Total average conversion value'},
+        'averageValue': {'type': ['null', 'number'], 'description': 'Average click-through conversion value'},
+        'viewAverageValue': {'type': ['null', 'number'], 'description': 'Average view-through conversion value'},
+        'totalRoas': {'type': ['null', 'number'], 'description': 'Total Return On Ad Spend'},
+        'roas': {'type': ['null', 'number'], 'description': 'Return On Ad Spend (click-through)'},
+        'optimizedConversions': {'type': ['null', 'integer'], 'description': 'Optimized conversions count'},
+        'fetched_from': {'type': ['null', 'string'], 'format': 'date', 'description': 'Start date of the report period'},
+        'fetched_to': {'type': ['null', 'string'], 'format': 'date', 'description': 'End date of the report period'}
     }
 }
 

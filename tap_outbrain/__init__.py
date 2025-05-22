@@ -28,7 +28,7 @@ DEFAULT_STATE = {
     'link_performance_outbrain': {}
 }
 
-DEFAULT_START_DATE = '2016-08-01'
+DEFAULT_START_DATE = '2020-01-01'
 
 def giveup(error):
     logger.error(error.response.text)
@@ -59,6 +59,7 @@ def request(url, access_token, params={}):
     response.raise_for_status()
     return response
 
+
 def generate_token(username, password):
     logger.info("Generating new token using basic auth.")
 
@@ -73,6 +74,7 @@ def generate_token(username, password):
     logger.info("Got response code: {}".format(response.status_code))
 
     return response.json().get('OB-TOKEN-V1')
+
 
 def parse_datetime(datetime_str):
     """Parse datetime string to ISO format with None handling."""
@@ -93,6 +95,36 @@ def decimal_to_float(obj):
     elif isinstance(obj, Decimal):
         return float(obj)
     return obj
+
+
+def get_all_marketers(access_token):
+    logger.info("Fetching list of all accessible marketers...")
+    try:
+        response = request(
+            f'{BASE_URL}/marketers',
+            access_token
+        )
+        marketers_data = response.json().get('marketers', [])
+        if not marketers_data:
+            logger.warning("No marketers found for the provided access token.")
+            return []
+        
+        extracted_marketers = []
+        for m_info in marketers_data:
+            m_id = m_info.get('id')
+            m_name = m_info.get('name')
+            if m_id and m_name:
+                extracted_marketers.append({'id': m_id, 'name': m_name})
+            else:
+                logger.warning(f"Marketer data missing id or name: {m_info}")
+        
+        logger.info(f"Found {len(extracted_marketers)} marketers.")
+        return extracted_marketers
+    except Exception as e:
+        logger.error(f"Error fetching marketers: {str(e)}")
+        logger.debug(e, exc_info=True)
+        return []
+
 
 def parse_performance(result: Dict[str, Any], extra_fields: Dict[str, Any]) -> Dict[str, Any]:
     """Parse performance metrics with decimal handling."""
@@ -139,45 +171,94 @@ def get_date_ranges(start, end, interval_in_days):
 
     return to_return
 
-def sync_campaign_performance(state, access_token, account_id, campaign_id, account_name, config):
+def sync_campaign_performance(state, access_token, current_marketer_id, current_marketer_name, config):
     """
-    Fetch aggregated campaign performance for a single campaign over the configured date range
+    Fetch aggregated campaign performance for all campaigns of a specific marketer over the configured date range.
     """
+    logger.info(f"Starting campaign performance sync for marketer ID: {current_marketer_id} (Name: {current_marketer_name})")
+
+    from_date = config['start_date']
+    # Use end_date from config if provided, otherwise use today's date
+    to_date = config.get('end_date') or datetime.date.today().isoformat()
+    
     params = {
-        'from': config.get('start_date'),
-        'to': config.get('end_date') or datetime.date.today().isoformat(),
-        'limit': 200
+        'from': from_date,
+        'to': to_date,
+        'limit': 500
     }
-    # Hit the same non-breakdown endpoint
+
+    logger.info(f"Fetching campaign reports for marketer {current_marketer_id} ({current_marketer_name}) from {from_date} to {to_date} with limit {params['limit']}")
+    
+    api_url = f"{BASE_URL}/reports/marketers/{current_marketer_id}/campaigns"
     response = request(
-        f"{BASE_URL}/reports/marketers/{account_id}/campaigns",
+        api_url,
         access_token,
         params
     )
     results = response.json().get('results', [])
+    
+    logger.info(f"Received {len(results)} campaign results from API for marketer {current_marketer_id}.")
+
     records = []
-    for c in results:
-        if str(c.get('metadata', {}).get('id')) != str(campaign_id):
-            continue
-        meta   = c['metadata']
-        m      = c['metrics']
-        budget = meta.get('budget', {})
-        records.append({
-            'id'           : meta.get('id'),
-            'name'         : meta.get('name'),
-            'identifier'   : meta.get('identifier'),
-            'spend'        : float(m.get('spend', 0.0)),
-            'impressions'  : int(m.get('impressions', 0)),
-            'clicks'       : int(m.get('clicks', 0)),
-            'currency'     : budget.get('currency'),
-            'start_date'   : config.get('start_date'),
-            'end_date'     : config.get('end_date'),
-            'fromDate'     : budget.get('startDate'),
-            'account_id'   : account_id,
-            'account_name' : account_name,
-        })
-    singer.write_records('campaign_performance_outbrain', records)
+    for c_result in results:
+        metadata = c_result.get('metadata', {})
+        metrics = c_result.get('metrics', {})
+
+        def get_metric(metric_name, default_val_if_none=None, cast_to_type=float):
+            val = metrics.get(metric_name)
+            if val is None:
+                return default_val_if_none
+            try:
+                if cast_to_type == int:
+                    return int(float(val)) 
+                return cast_to_type(val)
+            except (ValueError, TypeError):
+                logger.warning(
+                    f"Could not cast metric '{metric_name}' with value {repr(val)} "
+                    f"for campaign {metadata.get('id')} to {cast_to_type}. Using default: {default_val_if_none}."
+                )
+                return default_val_if_none
+        
+        record = {
+            'marketer_id': current_marketer_id,
+            'marketer_name': current_marketer_name,
+            'campaign_id': metadata.get('id'),
+            'campaign_name': metadata.get('name'),
+            'impressions': get_metric('impressions', 0, int),
+            'clicks': get_metric('clicks', 0, int),
+            'totalConversions': get_metric('totalConversions', 0, int),
+            'conversions': get_metric('conversions', 0, int),
+            'viewConversions': get_metric('viewConversions', 0, int),
+            'spend': get_metric('spend', 0.0, float),
+            'ecpc': get_metric('ecpc', 0.0, float),
+            'ctr': get_metric('ctr', 0.0, float),
+            'dstFeeCost': get_metric('dstFeeCost', 0.0, float),
+            'conversionRate': get_metric('conversionRate', 0.0, float),
+            'viewConversionRate': get_metric('viewConversionRate', 0.0, float),
+            'cpa': get_metric('cpa', 0.0, float),
+            'totalCpa': get_metric('totalCpa', 0.0, float),
+            'totalSumValue': get_metric('totalSumValue', 0.0, float),
+            'sumValue': get_metric('sumValue', 0.0, float),
+            'viewSumValue': get_metric('viewSumValue', 0.0, float),
+            'totalAverageValue': get_metric('totalAverageValue', 0.0, float),
+            'averageValue': get_metric('averageValue', 0.0, float),
+            'viewAverageValue': get_metric('viewAverageValue', 0.0, float),
+            'totalRoas': get_metric('totalRoas', 0.0, float),
+            'roas': get_metric('roas', 0.0, float),
+            'optimizedConversions': get_metric('optimizedConversions', 0, int),
+            'fetched_from': from_date,
+            'fetched_to': to_date
+        }
+        records.append(record)
+
+    if records:
+        singer.write_records('campaign_performance_outbrain', records)
+        logger.info(f"Wrote {len(records)} records to 'campaign_performance_outbrain' stream for marketer {current_marketer_id}.")
+    else:
+        logger.info(f"No records to write for 'campaign_performance_outbrain' stream for marketer {current_marketer_id}.")
+        
     return state
+
 
 def sync_link_performance(state, access_token, account_id, campaign_id,
                           link_id, config):
@@ -440,7 +521,7 @@ def sync_links(state, access_token, account_id, campaign_id, config):
     logger.info('Done syncing links for campaign {}.'.format(campaign_id))
 
 def validate_config(config):
-    required_keys = ['username', 'password', 'account_id', 'start_date']
+    required_keys = ['username', 'password', 'start_date'] 
     missing_keys = []
     null_keys = []
     has_errors = False
@@ -466,47 +547,76 @@ def validate_config(config):
         except ValueError:
             logger.fatal("end_date must be in YYYY-MM-DD format")
             has_errors = True
+    
+    # Validate start_date format
+    try:
+        datetime.datetime.strptime(config['start_date'], '%Y-%m-%d')
+    except ValueError:
+        logger.fatal("start_date must be in YYYY-MM-DD format")
+        has_errors = True
 
     if has_errors:
-        raise RuntimeError
+        raise RuntimeError("Config validation failed.")
+
 
 def do_sync(args):
     global DEFAULT_START_DATE
-    state = DEFAULT_STATE
+    logger.info("Starting Outbrain tap sync")
 
     with open(args.config) as config_file:
         config = json.load(config_file)
-
     validate_config(config)
-    
+
+    state = DEFAULT_STATE
+    if args.state:
+        logger.info(f"Loading state from {args.state}")
+        with open(args.state) as state_file:
+            state = json.load(state_file)
+    else:
+        logger.info("No state file provided, using default state.")
+
     username = config['username']
     password = config['password']
-    account_id = config['account_id']
-    DEFAULT_START_DATE = config['start_date'][:10]
+    
+    DEFAULT_START_DATE = config['start_date'][:10] 
 
     access_token = config.get('access_token')
-
-    if access_token is None:
+    if not access_token:
+        logger.info("Access token not found in config, generating new one.")
         access_token = generate_token(username, password)
 
-    if access_token is None:
-        logger.fatal("Failed to generate a new access token.")
-        raise RuntimeError
+    if not access_token:
+        logger.fatal("Failed to obtain access token. Exiting.")
+        raise RuntimeError("Access token generation failed.")
+    logger.info("Successfully obtained access token.")
 
-    singer.write_schema('campaigns_outbrain',
-                        schemas.campaign,
-                        key_properties=["id"])
+    # Schema
+    logger.info("Writing schema for 'campaign_performance_outbrain'")
     singer.write_schema('campaign_performance_outbrain',
                         schemas.campaign_performance,
-                        key_properties=[])
-    # singer.write_schema('links_outbrain',
-    #                     schemas.link,
-    #                     key_properties=["id"])
-    # singer.write_schema('link_performance_outbrain',
-    #                     schemas.link_performance,
-    #                     key_properties=["campaignId", "linkId", "fromDate"])
+                        key_properties=[]) 
 
-    sync_campaigns(state, access_token, account_id, config)
+    # # singer.write_schema('campaigns_outbrain', schemas.campaign, key_properties=["id"])
+
+    # Fetch all marketers associated with the token
+    all_marketers = get_all_marketers(access_token)
+
+    if not all_marketers:
+        logger.warning("No marketers found or accessible with the provided token. No campaign performance data will be synced.")
+    else:
+        logger.info(f"Found {len(all_marketers)} marketers. Syncing campaign performance for each.")
+        for marketer_info in all_marketers:
+            current_marketer_id = marketer_info['id']
+            current_marketer_name = marketer_info['name']
+            
+            # Call the sync function for campaign performance for the current marketer
+            logger.info(f"Processing marketer: {current_marketer_name} (ID: {current_marketer_id})")
+            sync_campaign_performance(state, access_token, current_marketer_id, current_marketer_name, config)
+
+    # # sync_campaigns(state, access_token, config['account_id'], config) # Original call might have used account_id from config
+
+    logger.info("Outbrain tap sync completed.")
+    # singer.write_state(state) # Uncomment if state is modified and needs to be persisted.
 
 def main():
     parser = argparse.ArgumentParser()
